@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Open World City Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: #000;
+            touch-action: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .hud-panel {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            pointer-events: auto;
+        }
+
+        #infoPanel {
+            top: 20px;
+            left: 20px;
+            min-width: 200px;
+        }
+
+        #minimapContainer {
+            top: 20px;
+            right: 20px;
+        }
+
+        #minimap {
+            border: 2px solid #fff;
+            border-radius: 5px;
+        }
+
+        #controls {
+            bottom: 20px;
+            left: 20px;
+        }
+
+        #transportInfo {
+            top: 80px;
+            left: 20px;
+            display: none;
+        }
+
+        #interactionPrompt {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 18px;
+            display: none;
+            text-align: center;
+        }
+
+        /* Mobile Controls */
+        .mobile-control {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        #joystickContainer {
+            bottom: 80px;
+            left: 40px;
+            width: 120px;
+            height: 120px;
+            display: none;
+        }
+
+        #joystickBase {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+        }
+
+        #joystickKnob {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #actionButtons {
+            bottom: 80px;
+            right: 40px;
+            display: none;
+        }
+
+        .action-btn {
+            width: 70px;
+            height: 70px;
+            margin: 10px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        .action-btn:active {
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        #transportButtons {
+            position: absolute;
+            bottom: 200px;
+            right: 40px;
+            display: none;
+        }
+
+        .transport-btn {
+            width: 60px;
+            height: 60px;
+            margin: 8px;
+            background: rgba(100, 149, 237, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            pointer-events: auto;
+        }
+
+        .transport-btn:active {
+            background: rgba(100, 149, 237, 0.9);
+        }
+
+        #menuBtn {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 30px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 5px;
+            font-size: 16px;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            #joystickContainer,
+            #actionButtons,
+            #transportButtons {
+                display: block !important;
+            }
+
+            .hud-panel {
+                font-size: 12px;
+                padding: 10px;
+            }
+
+            #infoPanel {
+                top: 70px;
+                left: 10px;
+            }
+
+            #minimapContainer {
+                top: 70px;
+                right: 10px;
+            }
+
+            #minimap {
+                width: 120px;
+                height: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <button id="menuBtn">🎮 Controls</button>
+        
+        <div id="infoPanel" class="hud-panel">
+            <h3>City Explorer</h3>
+            <p>Position: <span id="position">0, 0, 0</span></p>
+            <p>Speed: <span id="speed">0</span> km/h</p>
+            <p>Time: <span id="gameTime">12:00</span></p>
+            <p>FPS: <span id="fps">60</span></p>
+        </div>
+
+        <div id="minimapContainer" class="hud-panel">
+            <canvas id="minimap" width="150" height="150"></canvas>
+        </div>
+
+        <div id="transportInfo" class="hud-panel">
+            <h3>Transport Info</h3>
+            <p id="transportStatus">Waiting...</p>
+            <p id="nextStop">Next: -</p>
+        </div>
+
+        <div id="interactionPrompt">Press E / Tap to interact</div>
+
+        <div id="joystickContainer" class="mobile-control">
+            <div id="joystickBase"></div>
+            <div id="joystickKnob"></div>
+        </div>
+
+        <div id="actionButtons">
+            <button class="action-btn" id="jumpBtn">JUMP</button>
+            <button class="action-btn" id="interactBtn">USE</button>
+        </div>
+
+        <div id="transportButtons">
+            <button class="transport-btn" id="callTaxiBtn">🚕 TAXI</button>
+            <button class="transport-btn" id="metroBtn">🚇 METRO</button>
+            <button class="transport-btn" id="busBtn">🚌 BUS</button>
+        </div>
+    </div>
+
+    <script>
+        // Game Configuration
+        const CONFIG = {
+            WORLD_SIZE: 2000,
+            BUILDING_COUNT: 150,
+            NPC_COUNT: 100,
+            ROAD_WIDTH: 40,
+            BLOCK_SIZE: 200,
+            PLAYER_SPEED: 8,
+            PLAYER_RUN_SPEED: 15,
+            GRAVITY: 30,
+            JUMP_FORCE: 12,
+            DAY_LENGTH: 120, // seconds per day
+        };
+
+        // Game State
+        const gameState = {
+            player: {
+                x: 0,
+                y: 2,
+                z: 0,
+                vx: 0,
+                vy: 0,
+                vz: 0,
+                rotation: 0,
+                pitch: 0,
+                onGround: false,
+                inBuilding: null,
+                inVehicle: null,
+            },
+            camera: {
+                x: 0,
+                y: 5,
+                z: -10,
+                yaw: 0,
+                pitch: -0.3,
+            },
+            keys: {},
+            mouse: { x: 0, y: 0, locked: false },
+            joystick: { active: false, dx: 0, dy: 0 },
+            time: 0.5, // 0-1 day cycle
+            vehicles: [],
+            npcs: [],
+            buildings: [],
+            roads: [],
+            sidewalks: [],
+            metroStations: [],
+            busStops: [],
+            currentTransport: null,
+            fps: 60,
+            lastFrame: performance.now(),
+        };
+
+        // Canvas Setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const minimapCanvas = document.getElementById('minimap');
+        const minimapCtx = minimapCanvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 3D Math Functions
+        function project(x, y, z) {
+            const cam = gameState.camera;
+            
+            // Translate relative to camera
+            let dx = x - cam.x;
+            let dy = y - cam.y;
+            let dz = z - cam.z;
+
+            // Rotate around Y axis (yaw)
+            const cosYaw = Math.cos(cam.yaw);
+            const sinYaw = Math.sin(cam.yaw);
+            const rx = dx * cosYaw - dz * sinYaw;
+            const rz = dx * sinYaw + dz * cosYaw;
+
+            // Rotate around X axis (pitch)
+            const cosPitch = Math.cos(cam.pitch);
+            const sinPitch = Math.sin(cam.pitch);
+            const ry = dy * cosPitch - rz * sinPitch;
+            const rz2 = dy * sinPitch + rz * cosPitch;
+
+            // Project to 2D
+            if (rz2 <= 0.1) return null;
+            const fov = canvas.height / (2 * Math.tan(Math.PI / 6));
+            const px = canvas.width / 2 + (rx * fov) / rz2;
+            const py = canvas.height / 2 - (ry * fov) / rz2;
+            const scale = fov / rz2;
+
+            return { x: px, y: py, z: rz2, scale };
+        }
+
+        function drawPolygon(points, color, stroke = false) {
+            if (points.length < 3) return;
+            
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.closePath();
+            
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            if (stroke) {
+                ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        function drawCube(x, y, z, w, h, d, colors) {
+            const vertices = [
+                { x: x - w/2, y: y, z: z - d/2 },
+                { x: x + w/2, y: y, z: z - d/2 },
+                { x: x + w/2, y: y + h, z: z - d/2 },
+                { x: x - w/2, y: y + h, z: z - d/2 },
+                { x: x - w/2, y: y, z: z + d/2 },
+                { x: x + w/2, y: y, z: z + d/2 },
+                { x: x + w/2, y: y + h, z: z + d/2 },
+                { x: x - w/2, y: y + h, z: z + d/2 },
+            ];
+
+            const faces = [
+                { indices: [0, 1, 2, 3], color: colors.front },
+                { indices: [5, 4, 7, 6], color: colors.back },
+                { indices: [4, 0, 3, 7], color: colors.left },
+                { indices: [1, 5, 6, 2], color: colors.right },
+                { indices: [3, 2, 6, 7], color: colors.top },
+                { indices: [4, 5, 1, 0], color: colors.bottom },
+            ];
+
+            const projectedFaces = [];
+
+            for (const face of faces) {
+                const points = face.indices.map(i => project(vertices[i].x, vertices[i].y, vertices[i].z));
+                if (points.every(p => p !== null)) {
+                    const avgZ = points.reduce((sum, p) => sum + p.z, 0) / points.length;
+                    projectedFaces.push({ points, color: face.color, z: avgZ });
+                }
+            }
+
+            projectedFaces.sort((a, b) => b.z - a.z);
+            
+            for (const face of projectedFaces) {
+                drawPolygon(face.points, face.color, true);
+            }
+        }
+
+        // World Generation
+        function generateWorld() {
+            // Generate roads (grid pattern)
+            for (let x = -CONFIG.WORLD_SIZE/2; x <= CONFIG.WORLD_SIZE/2; x += CONFIG.BLOCK_SIZE) {
+                gameState.roads.push({
+                    x: x,
+                    z: -CONFIG.WORLD_SIZE/2,
+                    w: CONFIG.ROAD_WIDTH,
+                    d: CONFIG.WORLD_SIZE,
+                    direction: 'ns'
+                });
+            }
+            
+            for (let z = -CONFIG.WORLD_SIZE/2; z <= CONFIG.WORLD_SIZE/2; z += CONFIG.BLOCK_SIZE) {
+                gameState.roads.push({
+                    x: -CONFIG.WORLD_SIZE/2,
+                    z: z,
+                    w: CONFIG.WORLD_SIZE,
+                    d: CONFIG.ROAD_WIDTH,
+                    direction: 'ew'
+                });
+            }
+
+            // Generate buildings in blocks
+            for (let bx = -CONFIG.WORLD_SIZE/2 + CONFIG.BLOCK_SIZE/2; bx < CONFIG.WORLD_SIZE/2; bx += CONFIG.BLOCK_SIZE) {
+                for (let bz = -CONFIG.WORLD_SIZE/2 + CONFIG.BLOCK_SIZE/2; bz < CONFIG.WORLD_SIZE/2; bz += CONFIG.BLOCK_SIZE) {
+                    if (Math.random() > 0.3) {
+                        const width = 30 + Math.random() * 50;
+                        const depth = 30 + Math.random() * 50;
+                        const height = 20 + Math.random() * 100;
+                        const enterable = Math.random() > 0.7;
+                        
+                        gameState.buildings.push({
+                            x: bx + (Math.random() - 0.5) * (CONFIG.BLOCK_SIZE - width),
+                            z: bz + (Math.random() - 0.5) * (CONFIG.BLOCK_SIZE - depth),
+                            w: width,
+                            h: height,
+                            d: depth,
+                            enterable: enterable,
+                            interior: enterable ? {
+                                width: width - 4,
+                                depth: depth - 4,
+                                height: height - 4
+                            } : null,
+                            color: {
+                                front: `hsl(${Math.random() * 60 + 20}, 30%, ${40 + Math.random() * 20}%)`,
+                                back: `hsl(${Math.random() * 60 + 20}, 30%, ${35 + Math.random() * 20}%)`,
+                                left: `hsl(${Math.random() * 60 + 20}, 30%, ${38 + Math.random() * 20}%)`,
+                                right: `hsl(${Math.random() * 60 + 20}, 30%, ${42 + Math.random() * 20}%)`,
+                                top: '#666',
+                                bottom: '#333'
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Generate sidewalks
+            gameState.roads.forEach(road => {
+                const sidewalkOffset = CONFIG.ROAD_WIDTH/2 + 5;
+                if (road.direction === 'ns') {
+                    gameState.sidewalks.push({
+                        x: road.x + sidewalkOffset,
+                        z: road.z,
+                        w: 8,
+                        d: road.d
+                    });
+                    gameState.sidewalks.push({
+                        x: road.x - sidewalkOffset,
+                        z: road.z,
+                        w: 8,
+                        d: road.d
+                    });
+                } else {
+                    gameState.sidewalks.push({
+                        x: road.x,
+                        z: road.z + sidewalkOffset,
+                        w: road.w,
+                        d: 8
+                    });
+                    gameState.sidewalks.push({
+                        x: road.x,
+                        z: road.z - sidewalkOffset,
+                        w: road.w,
+                        d: 8
+                    });
+                }
+            });
+
+            // Generate Metro Stations
+            const metroLine = [
+                { x: -400, z: 0 },
+                { x: -200, z: 0 },
+                { x: 0, z: 0 },
+                { x: 200, z: 0 },
+                { x: 400, z: 0 }
+            ];
+            
+            metroLine.forEach((pos, i) => {
+                gameState.metroStations.push({
+                    x: pos.x,
+                    z: pos.z,
+                    name: `Metro Station ${i + 1}`,
+                    platforms: ['north', 'south']
+                });
+            });
+
+            // Generate Bus Stops
+            for (let i = 0; i < 20; i++) {
+                const road = gameState.roads[Math.floor(Math.random() * gameState.roads.length)];
+                gameState.busStops.push({
+                    x: road.x + (Math.random() - 0.5) * CONFIG.WORLD_SIZE * 0.8,
+                    z: road.z + (Math.random() - 0.5) * CONFIG.WORLD_SIZE * 0.8,
+                    name: `Bus Stop ${i + 1}`,
+                    routes: [1, 2, 3]
+                });
+            }
+
+            // Generate NPCs
+            for (let i = 0; i < CONFIG.NPC_COUNT; i++) {
+                const sidewalk = gameState.sidewalks[Math.floor(Math.random() * gameState.sidewalks.length)];
+                gameState.npcs.push({
+                    x: sidewalk.x + (Math.random() - 0.5) * sidewalk.w,
+                    y: 1.7,
+                    z: sidewalk.z + (Math.random() - 0.5) * 100,
+                    vx: (Math.random() - 0.5) * 3,
+                    vz: (Math.random() - 0.5) * 3,
+                    color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                    state: 'walking',
+                    targetX: null,
+                    targetZ: null
+                });
+            }
+
+            // Generate Vehicles (Taxis, Buses, Metro)
+            // Taxis
+            for (let i = 0; i < 20; i++) {
+                const road = gameState.roads[Math.floor(Math.random() * gameState.roads.length)];
+                gameState.vehicles.push({
+                    type: 'taxi',
+                    x: road.x + (Math.random() - 0.5) * 200,
+                    y: 1.5,
+                    z: road.z + (Math.random() - 0.5) * 200,
+                    vx: road.direction === 'ns' ? 0 : (Math.random() > 0.5 ? 8 : -8),
+                    vz: road.direction === 'ns' ? (Math.random() > 0.5 ? 8 : -8) : 0,
+                    available: true,
+                    passenger: null
+                });
+            }
+
+            // Buses
+            for (let i = 0; i < 5; i++) {
+                const road = gameState.roads[i % gameState.roads.length];
+                gameState.vehicles.push({
+                    type: 'bus',
+                    route: i + 1,
+                    x: road.x,
+                    y: 2,
+                    z: road.z,
+                    vx: road.direction === 'ns' ? 0 : 6,
+                    vz: road.direction === 'ns' ? 6 : 0,
+                    currentStop: 0,
+                    stops: gameState.busStops.filter((_, idx) => idx % 4 === i)
+                });
+            }
+
+            // Metro trains
+            for (let i = 0; i < 3; i++) {
+                gameState.vehicles.push({
+                    type: 'metro',
+                    x: metroLine[0].x,
+                    y: -5,
+                    z: metroLine[0].z,
+                    vx: 12,
+                    vz: 0,
+                    currentStation: 0,
+                    stations: metroLine,
+                    direction: 1
+                });
+            }
+        }
+
+        // Input Handling
+        document.addEventListener('keydown', (e) => {
+            gameState.keys[e.code] = true;
+            
+            if (e.code === 'KeyE' || e.code === 'Enter') {
+                checkInteraction();
+            }
+            
+            if (e.code === 'KeyM') {
+                toggleMobileControls();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            gameState.keys[e.code] = false;
+        });
+
+        // Mouse look
+        canvas.addEventListener('click', () => {
+            if (!gameState.mouse.locked && !isMobile()) {
+                canvas.requestPointerLock();
+            }
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            gameState.mouse.locked = document.pointerLockElement === canvas;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (gameState.mouse.locked) {
+                gameState.camera.yaw += e.movementX * 0.002;
+                gameState.camera.pitch = Math.max(-1.5, Math.min(1.5, gameState.camera.pitch - e.movementY * 0.002));
+            }
+        });
+
+        // Touch controls
+        const joystickContainer = document.getElementById('joystickContainer');
+        const joystickKnob = document.getElementById('joystickKnob');
+        let joystickTouchId = null;
+        let joystickCenter = { x: 0, y: 0 };
+
+        joystickContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            joystickTouchId = touch.identifier;
+            const rect = joystickContainer.getBoundingClientRect();
+            joystickCenter = {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+            };
+            updateJoystick(touch.clientX, touch.clientY);
+        });
+
+        joystickContainer.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchId) {
+                    updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+                    break;
+                }
+            }
+        });
+
+        joystickContainer.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchId) {
+                    joystickTouchId = null;
+                    gameState.joystick.dx = 0;
+                    gameState.joystick.dy = 0;
+                    joystickKnob.style.transform = 'translate(-50%, -50%)';
+                    break;
+                }
+            }
+        });
+
+        function updateJoystick(clientX, clientY) {
+            const maxDist = 60;
+            let dx = clientX - joystickCenter.x;
+            let dy = clientY - joystickCenter.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > maxDist) {
+                dx = (dx / dist) * maxDist;
+                dy = (dy / dist) * maxDist;
+            }
+            
+            joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            gameState.joystick.dx = dx / maxDist;
+            gameState.joystick.dy = dy / maxDist;
+            gameState.joystick.active = true;
+        }
+
+        // Action buttons
+        document.getElementById('jumpBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState.player.onGround) {
+                gameState.player.vy = CONFIG.JUMP_FORCE;
+                gameState.player.onGround = false;
+            }
+        });
+
+        document.getElementById('interactBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            checkInteraction();
+        });
+
+        // Transport buttons
+        document.getElementById('callTaxiBtn').addEventListener('click', callTaxi);
+        document.getElementById('metroBtn').addEventListener('click', useMetro);
+        document.getElementById('busBtn').addEventListener('click', useBus);
+
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        function toggleMobileControls() {
+            const show = document.getElementById('joystickContainer').style.display !== 'block';
+            document.getElementById('joystickContainer').style.display = show ? 'block' : 'none';
+            document.getElementById('actionButtons').style.display = show ? 'block' : 'none';
+            document.getElementById('transportButtons').style.display = show ? 'block' : 'none';
+        }
+
+        // Interaction System
+        function checkInteraction() {
+            const player = gameState.player;
+            
+            // Check building entry
+            if (!player.inBuilding) {
+                for (const building of gameState.buildings) {
+                    if (building.enterable) {
+                        const dx = Math.abs(player.x - building.x);
+                        const dz = Math.abs(player.z - building.z);
+                        if (dx < building.w/2 + 2 && dz < building.d/2 + 2 && player.y < building.h) {
+                            enterBuilding(building);
+                            return;
+                        }
+                    }
+                }
+            } else {
+                exitBuilding();
+                return;
+            }
+
+            // Check vehicle entry
+            if (!player.inVehicle) {
+                for (const vehicle of gameState.vehicles) {
+                    const dx = player.x - vehicle.x;
+                    const dz = player.z - vehicle.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    
+                    if (dist < 5 && vehicle.type === 'taxi' && vehicle.available) {
+                        enterTaxi(vehicle);
+                        return;
+                    }
+                    
+                    if (dist < 8 && (vehicle.type === 'bus' || vehicle.type === 'metro')) {
+                        enterPublicTransport(vehicle);
+                        return;
+                    }
+                }
+            } else {
+                exitVehicle();
+            }
+        }
+
+        function enterBuilding(building) {
+            gameState.player.inBuilding = building;
+            gameState.player.x = building.x;
+            gameState.player.z = building.z;
+            gameState.player.y = 0;
+            showInteractionPrompt('Press E / Tap to exit building');
+        }
+
+        function exitBuilding() {
+            const building = gameState.player.inBuilding;
+            gameState.player.inBuilding = null;
+            gameState.player.x = building.x + building.w/2 + 3;
+            gameState.player.z = building.z;
+            gameState.player.y = 2;
+        }
+
+        function enterTaxi(taxi) {
+            gameState.player.inVehicle = taxi;
+            taxi.available = false;
+            taxi.passenger = true;
+            showInteractionPrompt('Press E / Tap to exit taxi');
+            document.getElementById('transportInfo').style.display = 'block';
+            document.getElementById('transportStatus').textContent = 'In Taxi';
+        }
+
+        function enterPublicTransport(vehicle) {
+            gameState.player.inVehicle = vehicle;
+            showInteractionPrompt('Press E / Tap to exit');
+            document.getElementById('transportInfo').style.display = 'block';
+            document.getElementById('transportStatus').textContent = `On ${vehicle.type === 'metro' ? 'Metro' : 'Bus'} ${vehicle.route || ''}`;
+        }
+
+        function exitVehicle() {
+            const vehicle = gameState.player.inVehicle;
+            if (vehicle && vehicle.type === 'taxi') {
+                vehicle.available = true;
+                vehicle.passenger = null;
+            }
+            gameState.player.inVehicle = null;
+            gameState.player.x = vehicle.x + 5;
+            gameState.player.z = vehicle.z;
+            gameState.player.y = 2;
+            document.getElementById('transportInfo').style.display = 'none';
+        }
+
+        function callTaxi() {
+            const availableTaxi = gameState.vehicles.find(v => v.type === 'taxi' && v.available);
+            if (availableTaxi) {
+                availableTaxi.x = gameState.player.x + 10;
+                availableTaxi.z = gameState.player.z;
+                availableTaxi.vx = 0;
+                availableTaxi.vz = 0;
+                showInteractionPrompt('Taxi arrived! Press E / Tap to enter');
+            } else {
+                alert('No taxis available!');
+            }
+        }
+
+        function useMetro() {
+            const nearestStation = gameState.metroStations.reduce((nearest, station) => {
+                const dist = Math.sqrt((gameState.player.x - station.x)**2 + (gameState.player.z - station.z)**2);
+                return dist < nearest.dist ? { station, dist } : nearest;
+            }, { station: null, dist: Infinity });
+
+            if (nearestStation.station && nearestStation.dist < 50) {
+                const metro = gameState.vehicles.find(v => v.type === 'metro');
+                if (metro) {
+                    metro.x = nearestStation.station.x;
+                    metro.z = nearestStation.station.z;
+                    showInteractionPrompt('Metro arrived! Press E / Tap to enter');
+                }
+            } else {
+                alert('Find a metro station first!');
+            }
+        }
+
+        function useBus() {
+            const nearestStop = gameState.busStops.reduce((nearest, stop) => {
+                const dist = Math.sqrt((gameState.player.x - stop.x)**2 + (gameState.player.z - stop.z)**2);
+                return dist < nearest.dist ? { stop, dist } : nearest;
+            }, { stop: null, dist: Infinity });
+
+            if (nearestStop.stop && nearestStop.dist < 30) {
+                const bus = gameState.vehicles.find(v => v.type === 'bus');
+                if (bus) {
+                    bus.x = nearestStop.stop.x;
+                    bus.z = nearestStop.stop.z;
+                    bus.vx = 0;
+                    bus.vz = 0;
+                    showInteractionPrompt('Bus arrived! Press E / Tap to enter');
+                }
+            } else {
+                alert('Find a bus stop first!');
+            }
+        }
+
+        function showInteractionPrompt(text) {
+            const prompt = document.getElementById('interactionPrompt');
+            prompt.textContent = text;
+            prompt.style.display = 'block';
+            setTimeout(() => {
+                prompt.style.display = 'none';
+            }, 3000);
+        }
+
+        // Physics & Movement
+        function updatePhysics(dt) {
+            const player = gameState.player;
+            
+            if (player.inVehicle) {
+                player.x = player.inVehicle.x;
+                player.z = player.inVehicle.z;
+                player.y = player.inVehicle.y + 2;
+                return;
+            }
+
+            if (player.inBuilding) {
+                player.x = player.inBuilding.x;
+                player.z = player.inBuilding.z;
+                player.y = 0;
+                return;
+            }
+
+            // Keyboard input
+            let moveX = 0;
+            let moveZ = 0;
+            const speed = gameState.keys['ShiftLeft'] ? CONFIG.PLAYER_RUN_SPEED : CONFIG.PLAYER_SPEED;
+
+            if (gameState.keys['KeyW'] || gameState.keys['ArrowUp']) moveZ = 1;
+            if (gameState.keys['KeyS'] || gameState.keys['ArrowDown']) moveZ = -1;
+            if (gameState.keys['KeyA'] || gameState.keys['ArrowLeft']) moveX = -1;
+            if (gameState.keys['KeyD'] || gameState.keys['ArrowRight']) moveX = 1;
+
+            // Joystick input
+            if (gameState.joystick.active) {
+                moveX = gameState.joystick.dx;
+                moveZ = -gameState.joystick.dy;
+            }
+
+            // Apply movement relative to camera direction
+            if (moveX !== 0 || moveZ !== 0) {
+                const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
+                moveX /= len;
+                moveZ /= len;
+
+                const cosYaw = Math.cos(gameState.camera.yaw);
+                const sinYaw = Math.sin(gameState.camera.yaw);
+
+                player.vx = (moveX * cosYaw - moveZ * sinYaw) * speed;
+                player.vz = (moveX * sinYaw + moveZ * cosYaw) * speed;
+            } else {
+                player.vx *= 0.8;
+                player.vz *= 0.8;
+            }
+
+            // Jump
+            if ((gameState.keys['Space'] || gameState.keys['ArrowUp']) && player.onGround) {
+                player.vy = CONFIG.JUMP_FORCE;
+                player.onGround = false;
+            }
+
+            // Gravity
+            player.vy -= CONFIG.GRAVITY * dt;
+
+            // Apply velocity
+            player.x += player.vx * dt;
+            player.y += player.vy * dt;
+            player.z += player.vz * dt;
+
+            // Ground collision
+            if (player.y < 2) {
+                player.y = 2;
+                player.vy = 0;
+                player.onGround = true;
+            }
+
+            // Building collision
+            for (const building of gameState.buildings) {
+                if (player.x > building.x - building.w/2 - 1 && 
+                    player.x < building.x + building.w/2 + 1 &&
+                    player.z > building.z - building.d/2 - 1 && 
+                    player.z < building.z + building.d/2 + 1 &&
+                    player.y < building.h) {
+                    
+                    // Simple collision response
+                    const dx = player.x - building.x;
+                    const dz = player.z - building.z;
+                    
+                    if (Math.abs(dx) / building.w > Math.abs(dz) / building.d) {
+                        player.x = building.x + Math.sign(dx) * (building.w/2 + 2);
+                    } else {
+                        player.z = building.z + Math.sign(dz) * (building.d/2 + 2);
+                    }
+                }
+            }
+
+            // World bounds
+            const limit = CONFIG.WORLD_SIZE / 2;
+            player.x = Math.max(-limit, Math.min(limit, player.x));
+            player.z = Math.max(-limit, Math.min(limit, player.z));
+        }
+
+        function updateVehicles(dt) {
+            for (const vehicle of gameState.vehicles) {
+                if (vehicle.type === 'taxi' && !vehicle.passenger) {
+                    // Random taxi movement
+                    vehicle.x += vehicle.vx * dt;
+                    vehicle.z += vehicle.vz * dt;
+
+                    // Change direction randomly
+                    if (Math.random() < 0.01) {
+                        vehicle.vx = (Math.random() > 0.5 ? 1 : -1) * 8;
+                        vehicle.vz = (Math.random() > 0.5 ? 1 : -1) * 8;
+                    }
+                } else if (vehicle.type === 'bus') {
+                    // Bus follows route
+                    vehicle.x += vehicle.vx * dt;
+                    vehicle.z += vehicle.vz * dt;
+
+                    if (vehicle.stops && vehicle.stops.length > 0) {
+                        const targetStop = vehicle.stops[vehicle.currentStop % vehicle.stops.length];
+                        const dx = targetStop.x - vehicle.x;
+                        const dz = targetStop.z - vehicle.z;
+                        const dist = Math.sqrt(dx * dx + dz * dz);
+
+                        if (dist < 10) {
+                            vehicle.currentStop++;
+                            // Wait at stop
+                            setTimeout(() => {
+                                vehicle.vx = -vehicle.vx * 0.5;
+                                vehicle.vz = -vehicle.vz * 0.5;
+                            }, 2000);
+                        }
+                    }
+                } else if (vehicle.type === 'metro') {
+                    // Metro on fixed track
+                    vehicle.x += vehicle.vx * vehicle.direction * dt;
+
+                    const currentStationIdx = Math.floor((vehicle.x + CONFIG.WORLD_SIZE/2) / 200);
+                    if (currentStationIdx !== vehicle.currentStation) {
+                        vehicle.currentStation = currentStationIdx;
+                        if (vehicle.currentStation >= vehicle.stations.length - 1 || vehicle.currentStation <= 0) {
+                            vehicle.direction *= -1;
+                        }
+                    }
+                }
+
+                // Keep vehicles in world bounds
+                const limit = CONFIG.WORLD_SIZE / 2;
+                if (vehicle.x < -limit || vehicle.x > limit) vehicle.vx *= -1;
+                if (vehicle.z < -limit || vehicle.z > limit) vehicle.vz *= -1;
+            }
+        }
+
+        function updateNPCs(dt) {
+            for (const npc of gameState.npcs) {
+                // Simple wandering behavior
+                npc.x += npc.vx * dt;
+                npc.z += npc.vz * dt;
+
+                // Change direction randomly
+                if (Math.random() < 0.02) {
+                    npc.vx = (Math.random() - 0.5) * 4;
+                    npc.vz = (Math.random() - 0.5) * 4;
+                }
+
+                // Keep on sidewalks (roughly)
+                const limit = CONFIG.WORLD_SIZE / 2;
+                npc.x = Math.max(-limit, Math.min(limit, npc.x));
+                npc.z = Math.max(-limit, Math.min(limit, npc.z));
+            }
+        }
+
+        function updateCamera() {
+            const player = gameState.player;
+            const cam = gameState.camera;
+
+            if (player.inVehicle) {
+                // Third person view for vehicles
+                cam.x = player.x - Math.sin(cam.yaw) * 20;
+                cam.y = player.y + 10;
+                cam.z = player.z - Math.cos(cam.yaw) * 20;
+            } else if (player.inBuilding) {
+                // Interior view
+                cam.x = player.x;
+                cam.y = player.y + 3;
+                cam.z = player.z - 5;
+            } else {
+                // Third person follow camera
+                cam.x = player.x - Math.sin(cam.yaw) * 10;
+                cam.y = player.y + 5;
+                cam.z = player.z - Math.cos(cam.yaw) * 10;
+            }
+        }
+
+        // Rendering
+        function render() {
+            // Sky gradient
+            const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            const dayProgress = gameState.time;
+            const skyColor = dayProgress < 0.5 ? 
+                `hsl(210, 50%, ${60 + Math.sin(dayProgress * Math.PI) * 20}%)` :
+                `hsl(210, 50%, ${60 - Math.sin((dayProgress - 0.5) * Math.PI) * 20}%)`;
+            skyGradient.addColorStop(0, skyColor);
+            skyGradient.addColorStop(1, '#87CEEB');
+            ctx.fillStyle = skyGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Collect all renderable objects
+            const renderQueue = [];
+
+            // Add ground
+            renderQueue.push({
+                type: 'ground',
+                z: 0
+            });
+
+            // Add roads
+            for (const road of gameState.roads) {
+                const projected = project(road.x, 0, road.z);
+                if (projected && projected.z > 0.1) {
+                    renderQueue.push({
+                        type: 'road',
+                        road: road,
+                        z: projected.z
+                    });
+                }
+            }
+
+            // Add sidewalks
+            for (const sidewalk of gameState.sidewalks) {
+                const projected = project(sidewalk.x, 0.1, sidewalk.z);
+                if (projected && projected.z > 0.1) {
+                    renderQueue.push({
+                        type: 'sidewalk',
+                        sidewalk: sidewalk,
+                        z: projected.z
+                    });
+                }
+            }
+
+            // Add buildings
+            for (const building of gameState.buildings) {
+                const projected = project(building.x, building.h/2, building.z);
+                if (projected && projected.z > 0.1) {
+                    renderQueue.push({
+                        type: 'building',
+                        building: building,
+                        z: projected.z
+                    });
+                }
+            }
+
+            // Add NPCs
+            for (const npc of gameState.npcs) {
+                const projected = project(npc.x, npc.y, npc.z);
+                if (projected && projected.z > 0.1) {
+                    renderQueue.push({
+                        type: 'npc',
+                        npc: npc,
+                        z: projected.z
+                    });
+                }
+            }
+
+            // Add vehicles
+            for (const vehicle of gameState.vehicles) {
+                const projected = project(vehicle.x, vehicle.y, vehicle.z);
+                if (projected && projected.z > 0.1) {
+                    renderQueue.push({
+                        type: 'vehicle',
+                        vehicle: vehicle,
+                        z: projected.z
+                    });
+                }
+            }
+
+            // Sort by depth
+            renderQueue.sort((a, b) => b.z - a.z);
+
+            // Render all objects
+            for (const item of renderQueue) {
+                switch (item.type) {
+                    case 'ground':
+                        renderGround();
+                        break;
+                    case 'road':
+                        renderRoad(item.road);
+                        break;
+                    case 'sidewalk':
+                        renderSidewalk(item.sidewalk);
+                        break;
+                    case 'building':
+                        renderBuilding(item.building);
+                        break;
+                    case 'npc':
+                        renderNPC(item.npc);
+                        break;
+                    case 'vehicle':
+                        renderVehicle(item.vehicle);
+                        break;
+                }
+            }
+
+            // Update minimap
+            renderMinimap();
+
+            // Update HUD
+            updateHUD();
+        }
+
+        function renderGround() {
+            const corners = [
+                project(-CONFIG.WORLD_SIZE/2, 0, -CONFIG.WORLD_SIZE/2),
+                project(CONFIG.WORLD_SIZE/2, 0, -CONFIG.WORLD_SIZE/2),
+                project(CONFIG.WORLD_SIZE/2, 0, CONFIG.WORLD_SIZE/2),
+                project(-CONFIG.WORLD_SIZE/2, 0, CONFIG.WORLD_SIZE/2)
+            ];
+
+            if (corners.every(c => c !== null)) {
+                drawPolygon(corners, '#2d5a27');
+            }
+        }
+
+        function renderRoad(road) {
+            const y = 0.05;
+            const hw = road.w / 2;
+            const hd = road.d / 2;
+
+            const corners = [
+                project(road.x - hw, y, road.z - hd),
+                project(road.x + hw, y, road.z - hd),
+                project(road.x + hw, y, road.z + hd),
+                project(road.x - hw, y, road.z + hd)
+            ];
+
+            if (corners.every(c => c !== null)) {
+                drawPolygon(corners, '#333');
+                
+                // Road markings
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([20, 20]);
+                ctx.beginPath();
+                const center1 = project(road.x, y, road.z - hd);
+                const center2 = project(road.x, y, road.z + hd);
+                if (center1 && center2) {
+                    ctx.moveTo(center1.x, center1.y);
+                    ctx.lineTo(center2.x, center2.y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        function renderSidewalk(sidewalk) {
+            const hw = sidewalk.w / 2;
+            const hd = sidewalk.d / 2;
+
+            const corners = [
+                project(sidewalk.x - hw, 0.1, sidewalk.z - hd),
+                project(sidewalk.x + hw, 0.1, sidewalk.z - hd),
+                project(sidewalk.x + hw, 0.1, sidewalk.z + hd),
+                project(sidewalk.x - hw, 0.1, sidewalk.z + hd)
+            ];
+
+            if (corners.every(c => c !== null)) {
+                drawPolygon(corners, '#888');
+            }
+        }
+
+        function renderBuilding(building) {
+            drawCube(
+                building.x, 0, building.z,
+                building.w, building.h, building.d,
+                building.color
+            );
+
+            // Windows
+            const windowRows = Math.floor(building.h / 8);
+            const windowCols = Math.floor(building.w / 10);
+            
+            for (let row = 1; row < windowRows; row++) {
+                for (let col = 0; col < windowCols; col++) {
+                    const wx = building.x - building.w/2 + 5 + col * 10;
+                    const wy = row * 8;
+                    const wz = building.z - building.d/2 + 1;
+                    
+                    const projected = project(wx, wy, wz);
+                    if (projected && projected.z > 0.1) {
+                        ctx.fillStyle = Math.random() > 0.3 ? '#ffffaa' : '#333';
+                        ctx.fillRect(projected.x - 3, projected.y - 2, 6, 4);
+                    }
+                }
+            }
+        }
+
+        function renderNPC(npc) {
+            const projected = project(npc.x, npc.y, npc.z);
+            if (!projected) return;
+
+            const scale = projected.scale * 0.5;
+            
+            // Body
+            ctx.fillStyle = npc.color;
+            ctx.beginPath();
+            ctx.arc(projected.x, projected.y, 8 * scale, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head
+            ctx.fillStyle = '#ffdbac';
+            ctx.beginPath();
+            ctx.arc(projected.x, projected.y - 10 * scale, 5 * scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function renderVehicle(vehicle) {
+            let color, w, h, d;
+            
+            if (vehicle.type === 'taxi') {
+                color = { front: '#ffd700', back: '#ffd700', left: '#ffd700', right: '#ffd700', top: '#fff', bottom: '#333' };
+                w = 8; h = 4; d = 15;
+            } else if (vehicle.type === 'bus') {
+                color = { front: '#c00', back: '#c00', left: '#c00', right: '#c00', top: '#fff', bottom: '#333' };
+                w = 12; h = 8; d = 30;
+            } else if (vehicle.type === 'metro') {
+                color = { front: '#06c', back: '#06c', left: '#06c', right: '#06c', top: '#fff', bottom: '#333' };
+                w = 10; h = 8; d = 40;
+            }
+
+            drawCube(vehicle.x, vehicle.y, vehicle.z, w, h, d, color);
+        }
+
+        function renderMinimap() {
+            minimapCtx.fillStyle = '#2d5a27';
+            minimapCtx.fillRect(0, 0, 150, 150);
+
+            const scale = 0.15;
+            const centerX = 75;
+            const centerY = 75;
+
+            // Draw roads
+            minimapCtx.strokeStyle = '#333';
+            minimapCtx.lineWidth = 3;
+            for (const road of gameState.roads) {
+                minimapCtx.beginPath();
+                if (road.direction === 'ns') {
+                    minimapCtx.moveTo(centerX + (road.x - gameState.player.x) * scale, 0);
+                    minimapCtx.lineTo(centerX + (road.x - gameState.player.x) * scale, 150);
+                } else {
+                    minimapCtx.moveTo(0, centerY + (road.z - gameState.player.z) * scale);
+                    minimapCtx.lineTo(150, centerY + (road.z - gameState.player.z) * scale);
+                }
+                minimapCtx.stroke();
+            }
+
+            // Draw buildings
+            minimapCtx.fillStyle = '#666';
+            for (const building of gameState.buildings) {
+                const bx = centerX + (building.x - gameState.player.x) * scale;
+                const bz = centerY + (building.z - gameState.player.z) * scale;
+                const bw = building.w * scale;
+                const bd = building.d * scale;
+                minimapCtx.fillRect(bx - bw/2, bz - bd/2, bw, bd);
+            }
+
+            // Draw player
+            minimapCtx.fillStyle = '#0f0';
+            minimapCtx.beginPath();
+            minimapCtx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+            minimapCtx.fill();
+
+            // Draw player direction
+            minimapCtx.strokeStyle = '#0f0';
+            minimapCtx.lineWidth = 2;
+            minimapCtx.beginPath();
+            minimapCtx.moveTo(centerX, centerY);
+            minimapCtx.lineTo(
+                centerX + Math.sin(gameState.camera.yaw) * 15,
+                centerY + Math.cos(gameState.camera.yaw) * 15
+            );
+            minimapCtx.stroke();
+
+            // Draw transport
+            minimapCtx.fillStyle = '#ff0';
+            for (const vehicle of gameState.vehicles) {
+                const vx = centerX + (vehicle.x - gameState.player.x) * scale;
+                const vz = centerY + (vehicle.z - gameState.player.z) * scale;
+                if (vx >= 0 && vx <= 150 && vz >= 0 && vz <= 150) {
+                    minimapCtx.beginPath();
+                    minimapCtx.arc(vx, vz, 3, 0, Math.PI * 2);
+                    minimapCtx.fill();
+                }
+            }
+        }
+
+        function updateHUD() {
+            const player = gameState.player;
+            document.getElementById('position').textContent = 
+                `${player.x.toFixed(0)}, ${player.y.toFixed(0)}, ${player.z.toFixed(0)}`;
+            
+            const speed = Math.sqrt(player.vx * player.vx + player.vz * player.vz) * 3.6;
+            document.getElementById('speed').textContent = speed.toFixed(0);
+
+            const hours = Math.floor(gameState.time * 24);
+            const minutes = Math.floor((gameState.time * 24 - hours) * 60);
+            document.getElementById('gameTime').textContent = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+            document.getElementById('fps').textContent = gameState.fps.toFixed(0);
+        }
+
+        // Menu
+        document.getElementById('menuBtn').addEventListener('click', () => {
+            alert(`
+🎮 CONTROLS 🎮
+
+Keyboard:
+WASD / Arrow Keys - Move
+Mouse - Look around
+Space - Jump
+Shift - Run
+E - Interact
+M - Toggle mobile controls
+
+Mobile:
+Left joystick - Move
+Right buttons - Jump & Interact
+Transport buttons - Call vehicles
+
+Features:
+- Explore the open world city
+- Enter some buildings (marked)
+- Use taxis, buses, and metro
+- Watch NPCs walk around
+- Day/night cycle
+            `);
+        });
+
+        // Main Game Loop
+        function gameLoop() {
+            const now = performance.now();
+            const dt = Math.min((now - gameState.lastFrame) / 1000, 0.1);
+            gameState.lastFrame = now;
+            gameState.fps = 1 / dt;
+
+            // Update time
+            gameState.time = (gameState.time + dt / CONFIG.DAY_LENGTH) % 1;
+
+            updatePhysics(dt);
+            updateVehicles(dt);
+            updateNPCs(dt);
+            updateCamera();
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize
+        generateWorld();
+        gameLoop();
+    </script>
+</body>
+</html>
